@@ -1,0 +1,37 @@
+run:
+  # Timeout for analysis, adjust if needed
+  timeout: 5m
+
+linters-settings:
+  # Sensible Defaults 
+  govet:
+    check-shadowing: true # Important for maintainability
+
+  golint:
+    min-confidence: 0.8 # Start a bit higher for gradual adoption
+
+  gocyclo:
+    min-complexity: 15  # Adjust based on your project
+
+  errcheck:
+    # May need exclusions for your specific use cases
+    exclude: "./vendor/" 
+
+  dupl:
+    threshold: 100 # Threshold for code duplication
+
+linters:
+  enable-all: true # Start with most linters on
+
+  # Careful enabling these, noisy to start 
+  disable:
+    - maligned   
+    - prealloc   
+
+# Issues Settings (Adjust Severity)
+issues:
+  # Set max issues per linter 
+  max-issues-per-linter: 0  # Strive for no errors
+  
+  # Set max same issues across the code base
+  max-same-issues: 0   

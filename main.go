@@ -1,44 +1,106 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
+	"net/http"
+	"net/http/httputil"
 	"net/url"
+	"strings"
+	"sync/atomic"
 
-	"cloud.google.com/go/compute/metadata"
-	"golang.org/x/oauth2/google"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/viper"
 )
 
-// Simplified representation of your backend instances
-type Backend struct {
-	URL          *url.URL
-	Alive        bool
-	HealthStatus string
+var (
+	requestCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "api_requests_total",
+			Help: "Total number of API requests.",
+		},
+		[]string{"path", "method", "status"},
+	)
+)
+
+type target struct {
+	url        *url.URL
+	activeConn int32
 }
 
 func main() {
-	ctx := context.Background()
+	// Set up viper to read environment variables
+	viper.AutomaticEnv()
 
-	// Use google.FindDefaultCredentials. This will use the application default
-	// credentials, which are set by the GOOGLE_APPLICATION_CREDENTIALS environment variable.
-	creds, err := google.FindDefaultCredentials(ctx)
-	if err != nil {
-		log.Fatalf("Failed to find default credentials: %v", err)
+	// Get the FUNCTION_TARGETS environment variable
+	functionTargetsEnv := viper.GetString("FUNCTION_TARGETS")
+
+	// Split the environment variable into a slice
+	functionTargets := strings.Split(functionTargetsEnv, ",")
+
+	proxy := loadBalanceLeastConnections(functionTargets)
+
+	// Instrumentation
+	http.Handle("/metrics", promhttp.Handler())
+	prometheus.MustRegister(requestCounter)
+
+	http.HandleFunc("/", trackMetrics(proxy.ServeHTTP))
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
+
+}
+
+// Middleware for metrics
+func trackMetrics(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// ... track start time, defer metrics update ...
+		next.ServeHTTP(w, r)
+	}
+}
+
+func loadBalanceLeastConnections(targets []string) *httputil.ReverseProxy {
+	// Convert targets to *url.URL and wrap them in our custom struct
+	targetURLs := make([]*target, len(targets))
+	for i, rawurl := range targets {
+		u, _ := url.Parse(rawurl)
+		targetURLs[i] = &target{url: u}
 	}
 
-	// The project ID is part of the credentials.
-	projectID := creds.ProjectID
-	fmt.Printf("Project ID: %s\n", projectID)
+	director := func(req *http.Request) {
+		// Find the target with the least active connections
+		var minTarget *target
+		for _, target := range targetURLs {
+			if minTarget == nil || target.activeConn < minTarget.activeConn {
+				minTarget = target
+			}
+		}
 
-	// The region is not part of the credentials, but can be retrieved from the
-	// metadata server if running on GCP.
-	region, err := metadata.Get("instance/zone")
-	if err != nil {
-		log.Fatalf("Failed to get region: %v", err)
+		// Increment active connections
+		atomic.AddInt32(&minTarget.activeConn, 1)
+		defer atomic.AddInt32(&minTarget.activeConn, -1)
+
+		// Rewrite the request to be sent to the selected target
+		req.URL.Scheme = minTarget.url.Scheme
+		req.URL.Host = minTarget.url.Host
+		req.URL.Path = singleJoiningSlash(minTarget.url.Path, req.URL.Path)
+		if minTarget.url.RawQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = minTarget.url.RawQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = minTarget.url.RawQuery + "&" + req.URL.RawQuery
+		}
 	}
 
-	// The region is the last part of the zone name.
-	region = region[:len(region)-2]
-	fmt.Printf("Region: %s\n", region)
+	return &httputil.ReverseProxy{Director: director}
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
 }
