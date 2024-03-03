@@ -16,6 +16,9 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: '^1.19' # Specify a Go version
+      
+      - name: Set GOROOT
+        run: export GOROOT=$(go env GOROOT)  
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3 
