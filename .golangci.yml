@@ -13,10 +13,6 @@ linters-settings:
   gocyclo:
     min-complexity: 15  # Adjust based on your project
 
-  errcheck:
-    # May need exclusions for your specific use cases
-    exclude: "./vendor/" 
-
   dupl:
     threshold: 100 # Threshold for code duplication
 
