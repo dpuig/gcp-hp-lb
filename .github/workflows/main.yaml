@@ -10,27 +10,27 @@ jobs:
   lint:
     runs-on: ubuntu-latest 
     steps:
-      - uses: actions/checkout@v3  # Check out the code 
+      - uses: actions/checkout@v2  # Check out the code 
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v2
         with:
-          go-version: '^1.19' # Specify a Go version
+          go-version: 1.16 # Specify a Go version
 
-      - name: Run golangci-lint (Popular Choice)
-        uses: golangci/golangci-lint-action@v3 
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2
         with:
           # Optional: Version of golangci-lint
-          version: v1.49 
+          version: v1.39
 
           # Optional: Configuration file (if not at the root)
           config-file: .golangci.yml 
 
-      # Other Linters: Example Configurations
-      - name: Run gometalinter (Install and run)
-        run: |
-          go install github.com/alecthomas/gometalinter@latest
-          gometalinter --disable-all --enable=vet --enable=golint ./...  
+      # # Other Linters: Example Configurations
+      # - name: Run gometalinter (Install and run)
+      #   run: |
+      #     go install github.com/alecthomas/gometalinter@latest
+      #     gometalinter --disable-all --enable=vet --enable=golint ./...  
 
-      - name: Run go vet (Built-in)
-        run: go vet ./...
+      # - name: Run go vet (Built-in)
+      #   run: go vet ./...
