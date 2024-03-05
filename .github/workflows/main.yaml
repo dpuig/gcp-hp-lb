@@ -17,14 +17,14 @@ jobs:
         with:
           go-version: '^1.19' # Specify a Go version
       
-      - name: Set GOROOT
-        run: export GOROOT=$(go env GOROOT)  
+      # - name: Set GOROOT
+      #   run: export GOROOT=$(go env GOROOT)  
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3 
         with:
           # Optional: Version of golangci-lint
-          version: v1.49 
+          version: v1.56.2
 
           # Optional: Configuration file (if not at the root)
           config-file: .golangci.yml 
