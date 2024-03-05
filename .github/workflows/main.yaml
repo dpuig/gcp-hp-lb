@@ -16,9 +16,6 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: '^1.19' # Specify a Go version
-      
-      # - name: Set GOROOT
-      #   run: export GOROOT=$(go env GOROOT)  
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3 
@@ -29,11 +26,22 @@ jobs:
           # Optional: Configuration file (if not at the root)
           config-file: .golangci.yml 
 
-      # # Other Linters: Example Configurations
-      # - name: Run gometalinter (Install and run)
-      #   run: |
-      #     go install github.com/alecthomas/gometalinter@latest
-      #     gometalinter --disable-all --enable=vet --enable=golint ./...  
+  build_and_push:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-      # - name: Run go vet (Built-in)
-      #   run: go vet ./...
+      - name: Login to DockerHub
+        uses: docker/login-action@v1 
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: dpuigerarde/hp-lb:latest
