@@ -4,6 +4,9 @@ FROM golang:1.20-alpine as builder
 # Add Maintainer Info (Always a good practice)
 LABEL maintainer="Daniel Puig Gerarde <dpuigerarde@gmail.com>"
 
+# Install minimal dependencies
+RUN apk --no-cache add ca-certificates tzdata
+
 # Workdir optimization
 WORKDIR /app
 
@@ -20,12 +23,14 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflag
 ### Start a new stage ######
 FROM scratch
 
-# Install minimal dependencies for the smallest image
-RUN apk --no-cache add ca-certificates tzdata
+# Copy the binary from builder
+COPY --from=builder /app/main .
+
+# Copy the necessary certificates
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/
 
 WORKDIR /app
-
-COPY --from=builder /app/main .
 
 EXPOSE 8080
 
